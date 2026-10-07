@@ -1,0 +1,70 @@
+services:
+  db:
+    image: postgres:15-alpine
+    container_name: ${DB_CONTAINER_NAME}
+    restart: always
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    ports:
+      - '${DB_PORT}:5432'
+    volumes:
+      - ${DB_VOLUME_PATH}:/var/lib/postgresql/data
+    networks:
+      - intranet-network
+
+  minio:
+    image: minio/minio:latest
+    container_name: intranet-minio-prod
+    restart: always
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
+      MINIO_API_CORS_ALLOW_ORIGIN: ${MINIO_API_CORS_ALLOW_ORIGIN}
+    ports:
+      - '9000:9000'
+      - '9001:9001'
+    volumes:
+      - ${MINIO_VOLUME_PATH}:/data
+    networks:
+      - intranet-network
+    command: server /data --console-address ":9001"
+
+  api:
+    build:
+      context: .
+      dockerfile: ./apps/api/Dockerfile
+    container_name: intranet-api-prod
+    restart: always
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+    env_file:
+      - ./apps/api/.env.production
+    networks:
+      - intranet-network
+    ports:
+      - '3000:3000'
+    depends_on:
+      - db
+      - minio
+
+  web:
+    build:
+      context: .
+      dockerfile: ./apps/web/Dockerfile
+      args:
+        BUILD_MODE: production
+    container_name: intranet-web-prod
+    restart: always
+    env_file:
+      - ./apps/web/.env.production
+    networks:
+      - intranet-network
+    ports:
+      - '8081:80'
+
+networks:
+  intranet-network:
+    external: true

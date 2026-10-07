@@ -1,0 +1,9 @@
+export default {
+  semi: true,
+  singleQuote: true,
+  jsxSingleQuote: false,
+  tabWidth: 2,
+  trailingComma: 'all',
+  printWidth: 80,
+  tabWidth: 2,
+};
