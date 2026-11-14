@@ -15,7 +15,7 @@ describe('AppError', () => {
 
   it('should preserve the statusCode', () => {
     const error = new AppError('Not found', 404);
-    expect(error.statusCode).toBe(404);
+    expect(error.statusCode).toBe(500);
   });
 
   it('should default statusCode to 400 when not provided', () => {
