@@ -14,6 +14,7 @@ export default defineConfig({
     setupFiles: './src/setupTests.ts',
     testTimeout: 15000,
     coverage: {
+      enabled: true,
       provider: 'v8',
       reporter: ['text', 'html', 'lcov'],
       reportsDirectory: './coverage',
@@ -32,15 +33,6 @@ export default defineConfig({
         branches: 60,
         functions: 60,
         lines: 60,
-      },
-    },
-  },
-  build: {
-    rollupOptions: {
-      output: {
-        manualChunks: {
-          'lucide-icons': ['lucide-react'],
-        },
       },
     },
   },

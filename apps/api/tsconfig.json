@@ -27,10 +27,6 @@
   },
   "include": [
     "src/**/*",
-    "prisma/**/*.ts",
-    "prisma.config.mts",
-    "eslint.config.mjs",
-    "prisma/seed.mts",
     "vitest.config.ts"
   ],
   "exclude": ["node_modules", "dist"]
