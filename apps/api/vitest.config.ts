@@ -7,6 +7,7 @@ export default defineConfig({
     environment: 'node',
     fileParallelism: false,
     coverage: {
+      enabled: true,
       provider: 'v8',
       reporter: ['text', 'html', 'lcov'],
       reportsDirectory: './coverage',

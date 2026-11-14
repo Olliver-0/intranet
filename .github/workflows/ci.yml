@@ -1,62 +1,83 @@
-name: CI - Quality Check
+# MODELO DE CI — Node.js (React, Vue, Angular, Express, NestJS, Next...)
+#
+# Copie para o SEU repositório como:  .github/workflows/ci.yml
+# Depois ajuste as linhas marcadas com  # <-- AJUSTE
+#
+# Referência completa (projeto com 3 pastas): .github/workflows/ci.yml da ONGConecta.
+#
+# Na proteção da main, marque como obrigatórios SOMENTE:  ci-ok  e  titulo-pr
+
+name: CI
 
 on:
   pull_request:
-    branches: [develop, main]
-  push:
-    branches: [develop]
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
 
 jobs:
-  lint-and-build:
+  qualidade:
+    name: Lint, testes e build
     runs-on: ubuntu-latest
-
-    services:
-      postgres:
-        image: postgres:15-alpine
-        env:
-          POSTGRES_USER: user
-          POSTGRES_PASSWORD: password
-          POSTGRES_DB: db_test
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd pg_isready
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-
-    env:
-      DATABASE_URL: 'postgresql://user:password@localhost:5432/db_test?schema=public'
-      NODE_ENV: test
-      JWT_SECRET: ${{ secrets.JWT_SECRET }}
-      MINIO_PUBLIC_URL: 'http://localhost:9000'
-
+    defaults:
+      run:
+        working-directory: . # <-- AJUSTE se o package.json estiver numa subpasta (ex.: frontend)
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
-          node-version: '24.12.0'
-          cache: 'npm'
+          node-version: '24' # <-- AJUSTE se o projeto exigir outra versão
+          cache: npm
+          cache-dependency-path: ./package-lock.json # <-- AJUSTE junto com working-directory
 
-      - name: Install dependencies
-        run: npm ci
+      - name: Instalar dependências (exatamente as do lockfile)
+        run: npm ci # exige package-lock.json versionado
 
-      - name: Generate Prisma Client
-        run: npm run prisma --workspace=api -- generate
+      - name: Lint
+        run: npm run lint # crie o script "lint" no package.json (ESLint)
 
-      - name: Push Database Schema
-        run: npm run prisma --workspace=api -- db push --accept-data-loss
+      - name: Testes + quality gate de cobertura (PGC 5.3)
+        # O limite (60%) fica na configuração do runner de testes:
+        #   Jest   -> "coverageThreshold" no package.json   (ex.: api/package.json da ONGConecta)
+        #   Vitest -> test.coverage.thresholds no vite.config (ex.: web/vite.config.js)
+        run: npm test -- --coverage # <-- AJUSTE se o seu script de cobertura tiver outro nome
 
-      - name: Validate Database Schema
-        run: npm run db:validate
+      - name: Build
+        run: npm run build --if-present
 
-      - name: Lint Check
-        run: npm run lint
+  dependencias:
+    name: Análise de dependências (SCA)
+    # Compara as dependências do PR com a main e bloqueia vulnerabilidade crítica (PGC 5.3).
+    # Funciona para qualquer linguagem; exige repositório público (ou GitHub Advanced Security).
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/dependency-review-action@v5
+        with:
+          fail-on-severity: critical
 
-      - name: Run Integration Tests
-        run: npm run test
-
-      - name: Production Build
-        run: npm run build
+  ci-ok:
+    name: ci-ok
+    if: always()
+    needs: [qualidade, dependencias]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Conferir resultado dos jobs
+        env:
+          RESULTADOS: ${{ join(needs.*.result, ' ') }}
+        run: |
+          echo "Resultados: $RESULTADOS"
+          for r in $RESULTADOS; do
+            if [ "$r" = "failure" ] || [ "$r" = "cancelled" ]; then
+              echo "::error::Algum job do CI falhou — merge bloqueado (PGC 5.2)."
+              exit 1
+            fi
+          done
