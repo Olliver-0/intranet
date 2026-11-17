@@ -36,7 +36,6 @@ docker/postgres/data*
 
 # Docker database backups
 backups*
-*.sql.gz
 
 # node-waf configuration
 .lock-wscript
