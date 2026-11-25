@@ -1,0 +1,24 @@
+name: Defeito
+description: Relate um erro encontrado no Portal Brenner
+title: 'fix: '
+labels: ['defeito']
+body:
+  - type: input
+    id: versao
+    attributes:
+      label: Versão / ambiente
+      description: 'Informe a Release e ambiente afetado (ex.: "Produção NAS · v1.1.0")'
+    validations:
+      required: true
+  - type: textarea
+    id: passos
+    attributes:
+      label: Passos para reproduzir
+    validations:
+      required: true
+  - type: textarea
+    id: esperado
+    attributes:
+      label: Resultado esperado x obtido
+    validations:
+      required: true

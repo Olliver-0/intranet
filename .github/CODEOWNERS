@@ -1,0 +1,11 @@
+# Revisores automáticos por área — Portal Brenner (PGC 2 e 5.2).
+#
+# @gustavoelias11 é o par de revisão do projeto.
+# Mudanças em pipelines, scripts de deploy/backup, infraestrutura Docker e dependências
+# são de maior impacto e exigem atenção do responsável técnico (@Olliver-0).
+
+*                       @gustavoelias11
+/.github/               @Olliver-0 @gustavoelias11
+/scripts/               @Olliver-0 @gustavoelias11
+/docker-compose*.yml    @Olliver-0 @gustavoelias11
+**/package.json         @Olliver-0 @gustavoelias11

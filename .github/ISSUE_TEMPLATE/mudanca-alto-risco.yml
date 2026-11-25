@@ -1,0 +1,36 @@
+name: Mudança de alto risco (CCM)
+description: Mudança que exige decisão do Comitê de Controle de Mudanças — PGC 8.2
+title: '[Alto risco] '
+labels: ['ccm']
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Use este formulário para mudanças de alto risco no Portal Brenner (PGC 8.2).
+        O CCM (TI / Tech Lead + Diretoria/Marketing ou par de revisão) registra a decisão nos comentários.
+  - type: checkboxes
+    id: criterio
+    attributes:
+      label: Por que é alto risco?
+      options:
+        - label: Altera esquema do PostgreSQL ou volumes de dados no Synology NAS
+        - label: Envolve dados pessoais de colaboradores (LGPD) ou autenticação JWT
+        - label: 'Exceção ao fluxo padrão (ex.: hotfix ou janela de manutenção em produção)'
+  - type: textarea
+    id: descricao
+    attributes:
+      label: Descrição da mudança
+    validations:
+      required: true
+  - type: textarea
+    id: rollback
+    attributes:
+      label: Plano de rollback
+      description: 'Como voltar atrás se der errado? (tag anterior no workflow Rollback, restore-nas-prod.sh)'
+    validations:
+      required: true
+  - type: textarea
+    id: decisao
+    attributes:
+      label: Decisão do CCM (preenchido pelo comitê)
+      placeholder: Aprovada / Aprovada com ressalvas / Rejeitada — justificativa

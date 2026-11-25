@@ -1,0 +1,142 @@
+# Entrega Contínua (CD) — Portal Brenner (PGC seções 6 e 9)
+#
+#   merge na main
+#     └─ preparar ..... calcula a versão (SemVer) e gera o PACOTE uma única vez
+#         └─ staging .. pacote candidato disponível para validação
+#             └─ producao ... AGUARDA APROVAÇÃO (Environment "production")
+#                             cria a tag vX.Y.Z e a Release com notas + pacote .zip (baseline)
+
+name: CD
+
+on:
+  push:
+    branches: [main]
+    paths-ignore:
+      - 'docs/**'
+      - '**.md'
+  workflow_dispatch:
+
+concurrency:
+  group: cd-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  preparar:
+    name: Versão e pacote
+    runs-on: ubuntu-latest
+    outputs:
+      versao: ${{ steps.versao.outputs.versao }}
+      release: ${{ steps.versao.outputs.release }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0 # histórico completo: necessário para achar a última tag
+
+      - name: Calcular próxima versão (Conventional Commits)
+        id: versao
+        env:
+          NOTAS_ARQUIVO: notas-release.md
+        run: node scripts/proxima-versao.mjs
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: ./package-lock.json
+
+      - name: Build do monorepo (API + Web)
+        env:
+          VERSAO: ${{ steps.versao.outputs.versao }}
+        run: |
+          npm ci
+          npm run build
+          mkdir -p pacote/web pacote/api
+          cp -r apps/web/dist/* pacote/web/
+          cp -r apps/api/dist/* pacote/api/
+          echo "$VERSAO" > pacote/VERSAO
+
+      - name: Compactar pacote
+        env:
+          NOME: ${{ github.event.repository.name }}-${{ steps.versao.outputs.versao }}
+        run: |
+          test -d pacote || { echo "::error::A pasta pacote/ não foi criada pelo build."; exit 1; }
+          (cd pacote && zip -qr "../$NOME.zip" .)
+          echo "Pacote gerado: $NOME.zip"
+
+      - name: Guardar pacote (o MESMO vai para staging e produção)
+        uses: actions/upload-artifact@v7
+        with:
+          name: pacote
+          path: |
+            *.zip
+            notas-release.md
+          retention-days: 30
+
+  staging:
+    name: Staging
+    needs: preparar
+    runs-on: ubuntu-latest
+    environment:
+      name: staging
+      url: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          name: pacote
+
+      - name: Validar extração do pacote candidato
+        run: |
+          mkdir -p staging-check
+          unzip -q ./*.zip -d staging-check
+          ls -la staging-check
+
+      - name: Resumo
+        env:
+          VERSAO: ${{ needs.preparar.outputs.versao }}
+          RELEASE: ${{ needs.preparar.outputs.release }}
+        run: |
+          {
+            echo "## Staging — v$VERSAO"
+            echo "- Pacote candidato (API + Web): seção **Artifacts** desta execução (\`pacote\`)."
+            if [ "$RELEASE" = "true" ]; then
+              echo "- Valide o pacote e aprove o job **Produção** para criar a baseline **v$VERSAO**."
+            else
+              echo "- Sem commit feat/fix desde a última tag: não haverá release nova."
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  producao:
+    name: Produção
+    needs: [preparar, staging]
+    if: needs.preparar.outputs.release == 'true'
+    runs-on: ubuntu-latest
+    # Environment "production" com Required reviewers: o job PAUSA até a aprovação (PGC 6.1).
+    environment:
+      name: production
+      url: ${{ github.server_url }}/${{ github.repository }}/releases/tag/v${{ needs.preparar.outputs.versao }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/download-artifact@v8
+        with:
+          name: pacote
+          path: entrega
+
+      - name: Criar baseline — tag + Release com notas e pacote (PGC 9)
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: v${{ needs.preparar.outputs.versao }}
+        run: |
+          if git ls-remote --exit-code --tags origin "refs/tags/$TAG" > /dev/null; then
+            echo "::notice::Tag $TAG já existe — nada a fazer."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git tag -a "$TAG" -m "Release $TAG" "$GITHUB_SHA"
+          git push origin "$TAG"
+          gh release create "$TAG" entrega/*.zip --title "$TAG" \
+            --notes-file entrega/notas-release.md --verify-tag
